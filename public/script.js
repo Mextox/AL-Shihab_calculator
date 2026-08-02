@@ -1393,11 +1393,29 @@ async function searchGoogleImages(query) {
     }));
 }
 
+// محاولات متدرّجة: الاستعلام الكامل، ثم بلا سنة، ثم الشركة وحدها.
+// السيارات الحديثة قد لا توجد صور لسنتها بالضبط لكن للطراز صور كثيرة.
+function buildSearchAttempts(rawInput) {
+    const terms = window.CarTerms
+        ? window.CarTerms.toEnglishQuery(rawInput)
+        : { query: rawInput, translated: false, makes: [] };
+
+    const attempts = [terms.query];
+    const withoutYear = terms.query.replace(/\b(19|20)\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
+
+    if (withoutYear && withoutYear !== terms.query) attempts.push(withoutYear);
+    if (terms.makes.length > 1) attempts.push(terms.makes.join(' '));
+    if (terms.makes.length > 0) attempts.push(terms.makes[0]);
+    if (!terms.translated && rawInput.trim() !== terms.query) attempts.push(rawInput.trim());
+
+    return [...new Set(attempts.filter(Boolean))];
+}
+
 async function searchCarImages() {
-    const query = document.getElementById('carName').value.trim();
+    const rawInput = document.getElementById('carName').value.trim();
     const results = document.getElementById('imageResults');
 
-    if (!query) {
+    if (!rawInput) {
         showToast('اكتب اسم السيارة والموديل أولاً', 'error');
         document.getElementById('carName').focus();
         return;
@@ -1405,13 +1423,20 @@ async function searchCarImages() {
 
     const useGoogle = searchConfigured();
     const sourceLabel = useGoogle ? 'صور Google' : 'Wikimedia Commons';
+    const attempts = buildSearchAttempts(rawInput);
 
     results.classList.remove('hidden');
     results.innerHTML = '<div class="image-results-status"><i class="fas fa-spinner fa-spin"></i> جارٍ البحث…</div>';
 
-    let items;
+    let items = [];
+    let usedQuery = attempts[0];
+
     try {
-        items = useGoogle ? await searchGoogleImages(query) : await searchWikimedia(query);
+        for (const attempt of attempts) {
+            items = useGoogle ? await searchGoogleImages(attempt) : await searchWikimedia(attempt);
+            usedQuery = attempt;
+            if (items.length > 0) break;
+        }
     } catch (error) {
         console.error('فشل البحث عن الصور:', error);
         results.innerHTML = `<div class="image-results-status error">تعذّر البحث: ${escapeHtml(error.message)}</div>`;
@@ -1420,14 +1445,19 @@ async function searchCarImages() {
 
     if (items.length === 0) {
         results.innerHTML = `<div class="image-results-status">
-            لا توجد نتائج في ${sourceLabel} — جرّب الاسم بالإنجليزية مثل "Toyota Camry 2024"
+            لا توجد نتائج في ${sourceLabel} — جُرّب: ${escapeHtml(attempts.join(' · '))}
         </div>`;
         return;
     }
 
+    // نوضّح للمستخدم بأي صياغة وُجدت النتائج إن اختلفت عمّا كتبه
+    const queryNote = usedQuery !== rawInput
+        ? ` <span class="query-note">بحثنا عن: ${escapeHtml(usedQuery)}</span>`
+        : '';
+
     results.innerHTML = `
         <div class="image-results-status">
-            اختر صورة — ${items.length} نتيجة من ${sourceLabel}
+            اختر صورة — ${items.length} نتيجة من ${sourceLabel}${queryNote}
         </div>
         <div class="image-grid">
             ${items.map((item, i) => `

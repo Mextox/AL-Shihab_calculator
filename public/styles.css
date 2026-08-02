@@ -1210,3 +1210,12 @@ body {
         opacity: 1;
     }
 } 
+.query-note {
+    display: inline-block;
+    margin-inline-start: 0.4rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: var(--brand-gold-soft);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
