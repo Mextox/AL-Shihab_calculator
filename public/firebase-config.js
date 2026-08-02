@@ -10,10 +10,10 @@
 // ما دامت الحقول فارغة يعمل التطبيق بالتخزين المحلي في كل متصفح على حدة.
 
 window.FIREBASE_CONFIG = {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
+    apiKey: 'AIzaSyA4jAWo5z4Nq9gKCrvQ6sYY8EGoVzdjRWE',
+    authDomain: 'cars-finance-app.firebaseapp.com',
+    projectId: 'cars-finance-app',
+    storageBucket: 'cars-finance-app.firebasestorage.app',
+    messagingSenderId: '519329778973',
+    appId: '1:519329778973:web:deb47c9103bf87b4b925f4'
 };

@@ -69,7 +69,7 @@ const API = {
                 return await window.CloudStore.getSettings();
             } catch (error) {
                 console.error('تعذّرت قراءة الإعدادات من Firebase:', error);
-                showToast('تعذّر تحميل الإعدادات من Firebase — يتم استخدام القيم الافتراضية', 'error');
+                showToast(`${window.CloudStore.describeStoreError(error)} — يتم استخدام القيم الافتراضية`, 'error');
                 return null;
             }
         }
@@ -97,7 +97,7 @@ const API = {
                 return true;
             } catch (error) {
                 console.error('تعذّر حفظ الإعدادات في Firebase:', error);
-                showToast('فشل الحفظ — تأكد من تسجيل دخولك كمسؤول', 'error');
+                showToast(`فشل الحفظ — ${window.CloudStore.describeStoreError(error)}`, 'error');
                 return false;
             }
         }
@@ -164,7 +164,7 @@ const API = {
                 return true;
             } catch (error) {
                 console.error('تعذّر حفظ السيارات في Firebase:', error);
-                showToast('فشل الحفظ — تأكد من تسجيل دخولك كمسؤول', 'error');
+                showToast(`فشل الحفظ — ${window.CloudStore.describeStoreError(error)}`, 'error');
                 return false;
             }
         }
@@ -513,6 +513,9 @@ async function loadSettings() {
                 ...settings.appSettings
             }
         };
+    } else if (cloudEnabled()) {
+        // لم يحفظ المسؤول الإعدادات في Firestore بعد — تُستخدم القيم
+        // الافتراضية بصمت حتى أول حفظ، وأي فشل اتصال نبّه عنه API.getSettings
     } else if (!staticMode) {
         showToast('تعذّر تحميل الإعدادات من الخادم — يتم استخدام القيم الاحتياطية. تحقّق من الإعدادات قبل اعتماد أي حساب', 'error');
     }

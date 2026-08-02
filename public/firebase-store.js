@@ -137,18 +137,38 @@ store.isSignedIn = function () {
     return !!store.user;
 };
 
-// رسائل Firebase الإنجليزية تُترجم لرسائل مفهومة للمستخدم
+// رسائل Firebase الإنجليزية تُترجم لرسائل مفهومة تدلّ على الحل
 store.describeAuthError = function (error) {
     const messages = {
         'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
         'auth/user-disabled': 'هذا الحساب معطّل',
         'auth/user-not-found': 'لا يوجد حساب بهذا البريد',
         'auth/wrong-password': 'كلمة المرور غير صحيحة',
+        'auth/missing-password': 'أدخل كلمة المرور',
         'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة',
+        'auth/invalid-login-credentials': 'البريد أو كلمة المرور غير صحيحة',
         'auth/too-many-requests': 'محاولات كثيرة متتالية — انتظر قليلاً ثم أعد المحاولة',
-        'auth/network-request-failed': 'تعذّر الاتصال بالشبكة'
+        'auth/network-request-failed': 'تعذّر الاتصال بالشبكة',
+        // الحالتان التاليتان تعنيان أن الإعداد ناقص في لوحة Firebase
+        'auth/configuration-not-found':
+            'المصادقة غير مفعّلة في مشروع Firebase — فعّل Email/Password من Authentication',
+        'auth/operation-not-allowed':
+            'تسجيل الدخول بالبريد غير مفعّل — فعّل Email/Password من Authentication'
     };
     return messages[error && error.code] || 'تعذّر تسجيل الدخول — حاول مرة أخرى';
+};
+
+// أخطاء Firestore، وأهمها رفض القواعد لأنه يعني أن firestore.rules لم يُنشر
+store.describeStoreError = function (error) {
+    const code = error && error.code;
+
+    if (code === 'permission-denied') {
+        return 'قواعد أمان Firestore تمنع الوصول — انشر محتوى firestore.rules من لوحة Firebase';
+    }
+    if (code === 'unavailable' || code === 'failed-precondition') {
+        return 'تعذّر الوصول إلى Firestore — تحقّق من الاتصال ومن إنشاء قاعدة البيانات';
+    }
+    return 'تعذّر الوصول إلى Firestore';
 };
 
 window.CloudStore = store;
