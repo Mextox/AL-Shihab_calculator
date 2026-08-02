@@ -18,77 +18,132 @@ let appState = {
     currentTheme: 'light'
 };
 
-// API Functions
+// Storage Layer
+// يعمل التطبيق في وضعين: مع خادم Express فيكون التخزين موحّداً لكل الأجهزة،
+// أو بدون خادم مثل GitHub Pages فيكون التخزين في متصفح كل جهاز على حدة.
+const STORAGE_KEYS = {
+    settings: 'carFinance.settings',
+    cars: 'carFinance.cars',
+    password: 'carFinance.settingsPassword'
+};
+
+let staticMode = false; // يصبح true عند غياب خادم الـAPI
+
+function enterStaticMode() {
+    if (staticMode) return;
+    staticMode = true;
+    showToast('💾 لا يوجد خادم — يتم حفظ الإعدادات والسيارات في هذا المتصفح فقط', 'success');
+    document.querySelectorAll('.local-storage-note').forEach(el => el.classList.remove('hidden'));
+}
+
+function readLocal(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        console.error(`تعذّرت قراءة ${key} من التخزين المحلي:`, error);
+        return null;
+    }
+}
+
+function writeLocal(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+    } catch (error) {
+        console.error(`تعذّرت كتابة ${key} في التخزين المحلي:`, error);
+        showToast('تعذّر الحفظ في هذا المتصفح — تحقّق من إعدادات الخصوصية', 'error');
+        return false;
+    }
+}
+
 const API = {
     async getSettings() {
-        try {
-            const response = await fetch('/api/settings');
-            if (response.ok) {
-                return await response.json();
+        if (!staticMode) {
+            try {
+                const response = await fetch('/api/settings');
+                if (response.ok) {
+                    return await response.json();
+                }
+                throw new Error('Failed to load settings');
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                enterStaticMode();
             }
-            throw new Error('Failed to load settings');
-        } catch (error) {
-            console.error('Error loading settings:', error);
-            return null; // يتولى loadSettings التنبيه واستخدام القيم الاحتياطية
         }
+        return readLocal(STORAGE_KEYS.settings);
     },
 
     async saveSettings(settings) {
-        try {
-            const response = await fetch('/api/settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(settings)
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                showToast(result.message, 'success');
-                return true;
+        if (!staticMode) {
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showToast(result.message, 'success');
+                    return true;
+                }
+                throw new Error('Failed to save settings');
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showToast('فشل في حفظ الإعدادات على الخادم', 'error');
+                return false;
             }
-            throw new Error('Failed to save settings');
-        } catch (error) {
-            console.error('Error saving settings:', error);
-            showToast('فشل في حفظ الإعدادات', 'error');
+        }
+
+        if (!writeLocal(STORAGE_KEYS.settings, settings)) {
             return false;
         }
+        showToast('تم حفظ الإعدادات في هذا المتصفح', 'success');
+        return true;
     },
 
     async getCars() {
-        try {
-            const response = await fetch('/api/cars');
-            if (response.ok) {
-                return await response.json();
+        if (!staticMode) {
+            try {
+                const response = await fetch('/api/cars');
+                if (response.ok) {
+                    return await response.json();
+                }
+                throw new Error('Failed to load cars');
+            } catch (error) {
+                console.error('Error loading cars:', error);
+                enterStaticMode();
             }
-            throw new Error('Failed to load cars');
-        } catch (error) {
-            console.error('Error loading cars:', error);
-            return [];
         }
+        return readLocal(STORAGE_KEYS.cars) || [];
     },
 
     async saveCars(cars) {
-        try {
-            const response = await fetch('/api/cars', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(cars)
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                return true;
+        if (!staticMode) {
+            try {
+                const response = await fetch('/api/cars', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(cars)
+                });
+
+                if (response.ok) {
+                    return true;
+                }
+                throw new Error('Failed to save cars');
+            } catch (error) {
+                console.error('Error saving cars:', error);
+                showToast('فشل في حفظ السيارات على الخادم', 'error');
+                return false;
             }
-            throw new Error('Failed to save cars');
-        } catch (error) {
-            console.error('Error saving cars:', error);
-            showToast('فشل في حفظ السيارات', 'error');
-            return false;
         }
+
+        return writeLocal(STORAGE_KEYS.cars, cars);
     }
 };
 
@@ -179,6 +234,8 @@ function toggleSettings() {
 }
 
 function showPasswordModal() {
+    const isFirstRun = !getStoredPassword();
+
     // إنشاء النافذة المنبثقة
     const modal = document.createElement('div');
     modal.className = 'password-modal';
@@ -187,19 +244,21 @@ function showPasswordModal() {
             <div class="password-modal-header">
                 <h3>
                     <i class="fas fa-lock"></i>
-                    الدخول إلى الإعدادات
+                    ${isFirstRun ? 'تعيين كلمة مرور الإعدادات' : 'الدخول إلى الإعدادات'}
                 </h3>
                 <button class="close-btn" onclick="closePasswordModal()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="password-modal-body">
-                <p>يرجى إدخال كلمة المرور للوصول إلى الإعدادات:</p>
-                <input type="password" id="passwordInput" class="form-control" placeholder="أدخل كلمة المرور">
+                <p>${isFirstRun
+                    ? 'لا توجد كلمة مرور محفوظة في هذا المتصفح. اختر كلمة مرور لحماية الإعدادات:'
+                    : 'يرجى إدخال كلمة المرور للوصول إلى الإعدادات:'}</p>
+                <input type="password" id="passwordInput" class="form-control" placeholder="${isFirstRun ? 'اختر كلمة مرور جديدة' : 'أدخل كلمة المرور'}">
                 <div class="password-modal-buttons">
                     <button class="btn btn-primary" onclick="checkPassword()">
-                        <i class="fas fa-unlock"></i>
-                        تأكيد
+                        <i class="fas ${isFirstRun ? 'fa-key' : 'fa-unlock'}"></i>
+                        ${isFirstRun ? 'تعيين' : 'تأكيد'}
                     </button>
                     <button class="btn btn-outline" onclick="closePasswordModal()">
                         <i class="fas fa-times"></i>
@@ -225,23 +284,52 @@ function showPasswordModal() {
     });
 }
 
+function openSettingsPanel() {
+    const settingsPanel = document.getElementById('settingsPanel');
+    const settingsButton = document.querySelector('button[onclick="toggleSettings()"]');
+    const settingsIcon = settingsButton.querySelector('i');
+
+    settingsPanel.classList.remove('hidden');
+    settingsIcon.className = 'fas fa-unlock';
+    settingsButton.style.backgroundColor = 'var(--success-color)';
+}
+
+// كلمة المرور تُحفظ في متصفح كل جهاز ولا تُكتب في الكود المصدري،
+// حتى لا تنكشف لأي شخص يطّلع على المستودع.
+function getStoredPassword() {
+    return readLocal(STORAGE_KEYS.password);
+}
+
 function checkPassword() {
-    const password = document.getElementById('passwordInput').value;
-    
-    if (password === '132312') {
-        const settingsPanel = document.getElementById('settingsPanel');
-        const settingsButton = document.querySelector('button[onclick="toggleSettings()"]');
-        const settingsIcon = settingsButton.querySelector('i');
-        
-        settingsPanel.classList.remove('hidden');
-        settingsIcon.className = 'fas fa-unlock';
-        settingsButton.style.backgroundColor = 'var(--success-color)';
+    const input = document.getElementById('passwordInput');
+    const storedPassword = getStoredPassword();
+
+    // أول استخدام على هذا الجهاز: المُدخل يصبح كلمة المرور
+    if (!storedPassword) {
+        if (input.value.length < 4) {
+            showToast('اختر كلمة مرور من 4 خانات على الأقل', 'error');
+            input.focus();
+            return;
+        }
+
+        if (!writeLocal(STORAGE_KEYS.password, input.value)) {
+            return;
+        }
+
+        openSettingsPanel();
+        showToast('🔐 تم تعيين كلمة مرور الإعدادات لهذا المتصفح', 'success');
+        closePasswordModal();
+        return;
+    }
+
+    if (input.value === storedPassword) {
+        openSettingsPanel();
         showToast('🔓 تم فتح الإعدادات بنجاح', 'success');
         closePasswordModal();
     } else {
         showToast('🚫 كلمة المرور غير صحيحة', 'error');
-        document.getElementById('passwordInput').value = '';
-        document.getElementById('passwordInput').focus();
+        input.value = '';
+        input.focus();
     }
 }
 
@@ -280,9 +368,10 @@ async function loadSettings() {
                 ...settings.appSettings
             }
         };
-    } else {
+    } else if (!staticMode) {
         showToast('تعذّر تحميل الإعدادات من الخادم — يتم استخدام القيم الاحتياطية. تحقّق من الإعدادات قبل اعتماد أي حساب', 'error');
     }
+    // في الوضع المحلي بلا إعدادات محفوظة تُستخدم القيم الافتراضية بصمت
 
     // Update form fields
     const { ceiling, profitRate, discountedRate } = appState.settings.financialSettings;

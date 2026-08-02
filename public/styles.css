@@ -397,6 +397,25 @@ body {
     text-align: center;
 }
 
+/* Local Storage Notice */
+.local-storage-note {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+    padding: 0.9rem 1rem;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--border-radius);
+    color: var(--warning-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.local-storage-note.hidden {
+    display: none;
+}
+
 /* Cars List */
 .cars-list {
     margin-top: 2rem;
