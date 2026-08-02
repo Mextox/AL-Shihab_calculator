@@ -1341,6 +1341,58 @@ function promptImageUrl() {
     showToast('تم اعتماد رابط الصورة', 'success');
 }
 
+// مزوّد افتراضي بلا مفاتيح ولا حصة يومية، ويسمح بالوصول من المتصفح.
+// صوره حرة الترخيص فيجوز عرضها في التطبيق دون قلق.
+async function searchWikimedia(query) {
+    const url = 'https://commons.wikimedia.org/w/api.php'
+        + '?action=query&generator=search&gsrnamespace=6&gsrlimit=12'
+        + `&gsrsearch=${encodeURIComponent(query)}`
+        + '&prop=imageinfo&iiprop=url|mime&iiurlwidth=500'
+        + '&format=json&origin=*';
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const data = await response.json();
+    const pages = (data.query && data.query.pages) || {};
+
+    return Object.values(pages)
+        .map(page => {
+            const info = (page.imageinfo || [])[0] || {};
+            return {
+                title: String(page.title || '').replace(/^File:/, ''),
+                thumb: info.thumburl,
+                full: info.url,
+                mime: info.mime
+            };
+        })
+        // نستبعد الرسوم المتجهة والصيغ التي لا تُعرض جيداً كصورة سيارة
+        .filter(item => item.thumb && /^image\/(jpeg|png|webp)$/.test(item.mime || ''));
+}
+
+// مزوّد اختياري أدق للموديلات الحديثة، يحتاج مفاتيح وحصة يومية
+async function searchGoogleImages(query) {
+    const { apiKey, searchEngineId } = window.SEARCH_CONFIG;
+    const url = 'https://www.googleapis.com/customsearch/v1'
+        + `?key=${encodeURIComponent(apiKey)}`
+        + `&cx=${encodeURIComponent(searchEngineId)}`
+        + `&q=${encodeURIComponent(query + ' سيارة')}`
+        + '&searchType=image&num=8&imgSize=large&safe=active';
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error((data.error && data.error.message) || `HTTP ${response.status}`);
+    }
+
+    return (data.items || []).map(item => ({
+        title: item.title || '',
+        thumb: item.link,
+        full: item.link
+    }));
+}
+
 async function searchCarImages() {
     const query = document.getElementById('carName').value.trim();
     const results = document.getElementById('imageResults');
@@ -1351,58 +1403,47 @@ async function searchCarImages() {
         return;
     }
 
-    if (!searchConfigured()) {
-        showToast('البحث غير مضبوط — أضف مفاتيح Google في search-config.js، أو ارفع صورة من جهازك', 'error');
-        return;
-    }
+    const useGoogle = searchConfigured();
+    const sourceLabel = useGoogle ? 'صور Google' : 'Wikimedia Commons';
 
     results.classList.remove('hidden');
     results.innerHTML = '<div class="image-results-status"><i class="fas fa-spinner fa-spin"></i> جارٍ البحث…</div>';
 
-    const { apiKey, searchEngineId } = window.SEARCH_CONFIG;
-    const url = 'https://www.googleapis.com/customsearch/v1'
-        + `?key=${encodeURIComponent(apiKey)}`
-        + `&cx=${encodeURIComponent(searchEngineId)}`
-        + `&q=${encodeURIComponent(query + ' سيارة')}`
-        + '&searchType=image&num=8&imgSize=large&safe=active';
-
+    let items;
     try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!response.ok) {
-            const reason = (data.error && data.error.message) || `HTTP ${response.status}`;
-            results.innerHTML = `<div class="image-results-status error">تعذّر البحث: ${escapeHtml(reason)}</div>`;
-            return;
-        }
-
-        const items = data.items || [];
-        if (items.length === 0) {
-            results.innerHTML = '<div class="image-results-status">لا توجد نتائج — جرّب صياغة أخرى</div>';
-            return;
-        }
-
-        results.innerHTML = `
-            <div class="image-results-status">اختر صورة (${items.length} نتيجة)</div>
-            <div class="image-grid">
-                ${items.map((item, i) => `
-                    <button type="button" class="image-option" data-index="${i}" title="${escapeAttr(item.title || '')}">
-                        <img src="${escapeAttr(item.link)}" alt="" loading="lazy">
-                    </button>
-                `).join('')}
-            </div>
-        `;
-
-        results.querySelectorAll('.image-option').forEach(button => {
-            button.addEventListener('click', () => {
-                const item = items[Number(button.dataset.index)];
-                pickSearchResult(item.link, button);
-            });
-        });
+        items = useGoogle ? await searchGoogleImages(query) : await searchWikimedia(query);
     } catch (error) {
         console.error('فشل البحث عن الصور:', error);
-        results.innerHTML = '<div class="image-results-status error">تعذّر الاتصال بخدمة البحث</div>';
+        results.innerHTML = `<div class="image-results-status error">تعذّر البحث: ${escapeHtml(error.message)}</div>`;
+        return;
     }
+
+    if (items.length === 0) {
+        results.innerHTML = `<div class="image-results-status">
+            لا توجد نتائج في ${sourceLabel} — جرّب الاسم بالإنجليزية مثل "Toyota Camry 2024"
+        </div>`;
+        return;
+    }
+
+    results.innerHTML = `
+        <div class="image-results-status">
+            اختر صورة — ${items.length} نتيجة من ${sourceLabel}
+        </div>
+        <div class="image-grid">
+            ${items.map((item, i) => `
+                <button type="button" class="image-option" data-index="${i}" title="${escapeAttr(item.title)}">
+                    <img src="${escapeAttr(item.thumb)}" alt="" loading="lazy">
+                </button>
+            `).join('')}
+        </div>
+    `;
+
+    results.querySelectorAll('.image-option').forEach(button => {
+        button.addEventListener('click', () => {
+            const item = items[Number(button.dataset.index)];
+            pickSearchResult(item.thumb, button);
+        });
+    });
 }
 
 // الصورة المختارة تُنسخ إلى Firebase Storage حتى لا تعتمد على بقاء
