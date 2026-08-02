@@ -805,14 +805,14 @@ function displayResults(results) {
     const resultsContent = document.getElementById('resultsContent');
     
     resultsContent.innerHTML = `
-        <div class="result-item">
+        <div class="result-item result-hero">
             <div class="label">
                 <i class="fas fa-calendar-alt"></i>
                 القسط الشهري
             </div>
-            <div class="value">${formatNumber(results.monthlyInstallment)} د.ل</div>
+            <div class="value">${formatNumber(results.monthlyInstallment)} <span class="unit">د.ل</span></div>
         </div>
-        
+
         <div class="result-item">
             <div class="label">
                 <i class="fas fa-car"></i>

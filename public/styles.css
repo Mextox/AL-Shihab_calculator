@@ -1,30 +1,55 @@
-/* CSS Variables for Theme Support */
+/* ————————————————————————————————————————————————
+   هوية الشهاب لاستيراد السيارات
+   أسود العلامة أساساً، ولمسة ذهبية مأخوذة من نجمة اللوغو.
+   ———————————————————————————————————————————————— */
 :root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --secondary-color: #64748b;
-    --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --danger-color: #ef4444;
-    --bg-color: #f8fafc;
+    /* لون العلامة الثابت في الوضعين — الترويسة وشاشة التحميل */
+    --brand-ink: #15171c;
+    --brand-ink-2: #2b3039;
+    --brand-gold: #c8a44a;
+    --brand-gold-soft: rgba(200, 164, 74, 0.14);
+
+    /* اللون التفاعلي: أسود على الفاتح، ذهبي على الداكن */
+    --primary-color: #15171c;
+    --primary-hover: #2b3039;
+    --on-primary: #ffffff;
+
+    --secondary-color: #6b7280;
+    --success-color: #15803d;
+    --warning-color: #b45309;
+    --danger-color: #b91c1c;
+
+    --bg-color: #f5f4f1;
     --card-bg: #ffffff;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --border-color: #e2e8f0;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    --border-radius: 12px;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --text-primary: #15171c;
+    --text-secondary: #6b7280;
+    --border-color: #e4e1da;
+
+    --shadow: 0 1px 2px rgba(21, 23, 28, 0.06), 0 4px 12px rgba(21, 23, 28, 0.05);
+    --shadow-lg: 0 8px 32px rgba(21, 23, 28, 0.12);
+    --border-radius: 14px;
+    --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Dark Theme */
 [data-theme="dark"] {
-    --bg-color: #0f172a;
-    --card-bg: #1e293b;
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --border-color: #334155;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    /* الذهبي يُقرأ جيداً على الداكن، والأسود يختفي فيه */
+    --primary-color: #c8a44a;
+    --primary-hover: #d9b862;
+    --on-primary: #15171c;
+
+    --success-color: #34d399;
+    --warning-color: #fbbf24;
+    --danger-color: #f87171;
+
+    --bg-color: #0d0e11;
+    --card-bg: #16181d;
+    --text-primary: #f3f2ef;
+    --text-secondary: #a3a7af;
+    --border-color: #2a2d35;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* Reset & Base Styles */
@@ -56,7 +81,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    background: linear-gradient(140deg, var(--brand-ink), var(--brand-ink-2));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -102,7 +127,7 @@ body {
 
 /* Header */
 .header {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    background: linear-gradient(140deg, var(--brand-ink), var(--brand-ink-2));
     color: white;
     padding: 1rem 0;
     box-shadow: var(--shadow-lg);
@@ -160,7 +185,7 @@ body {
 .card-header {
     padding: 1.5rem;
     border-bottom: 1px solid var(--border-color);
-    background: linear-gradient(135deg, var(--card-bg), rgba(37, 99, 235, 0.05));
+    background: linear-gradient(135deg, var(--card-bg), var(--brand-gold-soft));
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -216,7 +241,7 @@ body {
 .form-control:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(200, 164, 74, 0.25);
 }
 
 .form-control::placeholder {
@@ -247,7 +272,7 @@ body {
 
 .btn-primary {
     background: var(--primary-color);
-    color: white;
+    color: var(--on-primary);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -261,7 +286,7 @@ body {
 }
 
 .btn-success:hover:not(:disabled) {
-    background: #059669;
+    background: var(--success-color); filter: brightness(1.15);
     transform: translateY(-1px);
 }
 
@@ -271,18 +296,33 @@ body {
 }
 
 .btn-danger:hover:not(:disabled) {
-    background: #dc2626;
+    background: var(--danger-color); filter: brightness(1.15);
     transform: translateY(-1px);
 }
 
+/* الافتراضي داخل البطاقات الفاتحة — يتبع لون النص لا الأبيض */
 .btn-outline {
     background: transparent;
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: var(--text-primary);
+    border: 2px solid var(--border-color);
 }
 
 .btn-outline:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--brand-gold-soft);
+    border-color: var(--brand-gold);
+}
+
+/* داخل الأسطح الداكنة (الترويسة والنوافذ) يعود أبيض */
+.header .btn-outline,
+.password-modal-header .btn-outline {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.header .btn-outline:hover:not(:disabled),
+.password-modal-header .btn-outline:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.6);
 }
 
 .btn-large {
@@ -357,7 +397,7 @@ body {
 }
 
 .result-item {
-    background: linear-gradient(135deg, var(--card-bg), rgba(37, 99, 235, 0.05));
+    background: linear-gradient(135deg, var(--card-bg), var(--brand-gold-soft));
     padding: 1.5rem;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
@@ -510,6 +550,49 @@ body {
     .logo h1 { font-size: 1.15rem; }
 }
 
+/* ————— القسط الشهري: أهم رقم في الشاشة ————— */
+.result-hero {
+    grid-column: 1 / -1;
+    background: linear-gradient(140deg, var(--brand-ink), var(--brand-ink-2)) !important;
+    border: none !important;
+    color: #fff;
+    padding: 1.75rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+/* وهج ذهبي خفيف يستحضر نجمة اللوغو */
+.result-hero::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: -30%;
+    top: -60%;
+    width: 60%;
+    height: 220%;
+    background: radial-gradient(ellipse at center, rgba(200, 164, 74, 0.22), transparent 70%);
+    pointer-events: none;
+}
+
+.result-hero .label {
+    color: rgba(255, 255, 255, 0.75) !important;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+}
+
+.result-hero .value {
+    color: var(--brand-gold) !important;
+    font-size: clamp(2rem, 6vw, 2.9rem);
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.result-hero .value .unit {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    margin-inline-start: 0.35rem;
+}
+
 /* ————— نطاق سعر الإغلاق ————— */
 .range-inputs {
     display: flex;
@@ -537,7 +620,7 @@ body {
     margin-right: 0.35rem;
     border-radius: 999px;
     background: var(--primary-color);
-    color: #fff;
+    color: var(--on-primary);
     font-size: 0.65rem;
     font-weight: 600;
     vertical-align: middle;
@@ -900,13 +983,13 @@ body {
 }
 
 @keyframes pulseOnLoad {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
-    50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(200, 164, 74, 0.45); }
+    50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(200, 164, 74, 0); }
 }
 
 .details-header {
     padding: 1.2rem 1.5rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    background: linear-gradient(140deg, var(--brand-ink), var(--brand-ink-2));
     color: white;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
@@ -916,13 +999,13 @@ body {
     transition: var(--transition);
     user-select: none;
     border-radius: var(--border-radius) var(--border-radius) 0 0;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+    box-shadow: var(--shadow);
 }
 
 .details-header:hover {
-    background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
+    background: linear-gradient(140deg, var(--brand-ink-2), var(--brand-ink));
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    box-shadow: var(--shadow-lg);
 }
 
 .details-header h4 {
@@ -959,8 +1042,8 @@ body {
 
 .details-content .result-item {
     margin-bottom: 1rem;
-    border: 1px solid rgba(37, 99, 235, 0.1);
-    background: rgba(37, 99, 235, 0.02);
+    border: 1px solid rgba(200, 164, 74, 0.25);
+    background: var(--brand-gold-soft);
     min-height: auto;
     word-wrap: break-word;
 }
@@ -1037,7 +1120,7 @@ body {
 .password-modal-header {
     padding: 1.5rem;
     border-bottom: 1px solid var(--border-color);
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    background: linear-gradient(140deg, var(--brand-ink), var(--brand-ink-2));
     color: white;
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     display: flex;
