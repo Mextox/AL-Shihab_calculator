@@ -29,6 +29,10 @@ jobs:
         with:
           enablement: true
 
+      # بصمة الإصدار: تمنع المتصفحات من عرض نسخة مخبأة بعد كل نشر
+      - name: Stamp asset version
+        run: sed -i "s/?v=DEV/?v=${GITHUB_SHA::8}/g" public/index.html
+
       # يُنشر محتوى public/ فقط، أما server.js فيبقى في المستودع
       # لتشغيل التطبيق على خادم خاص عند الحاجة
       - uses: actions/upload-pages-artifact@v3
