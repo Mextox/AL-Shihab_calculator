@@ -24,7 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # enablement يفعّل GitHub Pages تلقائياً دون ضبط يدوي من الإعدادات
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       # يُنشر محتوى public/ فقط، أما server.js فيبقى في المستودع
       # لتشغيل التطبيق على خادم خاص عند الحاجة
