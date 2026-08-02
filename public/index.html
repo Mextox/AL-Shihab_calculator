@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حاسبة تمويل السيارات الاحترافية</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-screen">
+        <div class="loader">
+            <i class="fas fa-car"></i>
+            <p>جاري التحميل...</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-calculator"></i>
+                    <h1>حاسبة تمويل السيارات</h1>
+                </div>
+                <div class="header-controls">
+                    <button class="btn btn-outline" onclick="toggleTheme()">
+                        <i class="fas fa-moon" id="themeIcon"></i>
+                    </button>
+                    <button class="btn btn-primary" onclick="toggleSettings()">
+                        <i class="fas fa-lock"></i>
+                        الإعدادات
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <div class="container">
+            <!-- Settings Panel -->
+            <section id="settingsPanel" class="settings-panel hidden">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cog"></i> إعدادات النظام</h3>
+                        <button class="close-btn" onclick="closeSettings()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="ceiling">
+                                    <i class="fas fa-hand-holding-usd"></i>
+                                    سقف المرابحة (د.ل)
+                                </label>
+                                <input type="number" id="ceiling" class="form-control" placeholder="أدخل سقف المرابحة">
+                            </div>
+                            <div class="form-group">
+                                <label for="profitRate">
+                                    <i class="fas fa-percentage"></i>
+                                    هامش الربح السنوي (%)
+                                </label>
+                                <input type="number" id="profitRate" class="form-control" step="0.01" placeholder="هامش الربح">
+                            </div>
+                            <div class="form-group">
+                                <label for="discountedRate">
+                                    <i class="fas fa-tags"></i>
+                                    هامش الربح بعد التخفيض (%)
+                                </label>
+                                <input type="number" id="discountedRate" class="form-control" step="0.01" placeholder="هامش الربح المخفض">
+                            </div>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-success" onclick="saveSettings()">
+                                <i class="fas fa-save"></i>
+                                حفظ الإعدادات
+                            </button>
+                            <button class="btn btn-danger" onclick="clearAllData()">
+                                <i class="fas fa-trash"></i>
+                                مسح جميع البيانات
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Calculator Section -->
+            <section class="calculator-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-calculator"></i> حاسبة التمويل</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="calculatorForm" class="calculator-form">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="salary">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                        مرتب العميل (د.ل)
+                                    </label>
+                                    <input type="number" id="salary" class="form-control" placeholder="أدخل مرتب العميل" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="years">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        مدة التمويل (سنوات)
+                                    </label>
+                                    <select id="years" class="form-control" required>
+                                        <option value="">اختر المدة</option>
+                                        <option value="1">سنة واحدة</option>
+                                        <option value="2">سنتان</option>
+                                        <option value="3">3 سنوات</option>
+                                        <option value="4">4 سنوات</option>
+                                        <option value="5">5 سنوات</option>
+                                        <option value="6">6 سنوات</option>
+                                        <option value="7">7 سنوات</option>
+                                        <option value="8">8 سنوات</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="hasDiscount">
+                                        <i class="fas fa-tag"></i>
+                                        هل العميل يحصل على تخفيض؟
+                                    </label>
+                                    <select id="hasDiscount" class="form-control">
+                                        <option value="no">لا</option>
+                                        <option value="yes">نعم</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="carPrice">
+                                        <i class="fas fa-car"></i>
+                                        سعر شراء السيارة (د.ل)
+                                    </label>
+                                    <input type="number" id="carPrice" class="form-control" placeholder="أدخل سعر السيارة" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="closingPrice">
+                                        <i class="fas fa-handshake"></i>
+                                        سعر الإغلاق (د.ل) <span style="color: var(--text-secondary); font-size: 0.85rem;">(اختياري)</span>
+                                    </label>
+                                    <input type="number" id="closingPrice" class="form-control" placeholder="أدخل سعر الإغلاق (اختياري)">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-large">
+                                <i class="fas fa-calculator"></i>
+                                احسب التمويل
+                            </button>
+                        </form>
+                        
+                        <!-- Results Display -->
+                        <div id="results" class="results-container hidden">
+                            <div class="results-header">
+                                <h4><i class="fas fa-chart-line"></i> نتائج الحساب</h4>
+                            </div>
+                            <div id="resultsContent" class="results-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Cars Management Section -->
+            <section class="cars-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-car"></i> إدارة السيارات</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="carForm" class="car-form">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="carName">
+                                        <i class="fas fa-tag"></i>
+                                        اسم السيارة
+                                    </label>
+                                    <input type="text" id="carName" class="form-control" placeholder="مثال: تويوتا كامري 2024" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="carPriceAdd">
+                                        <i class="fas fa-dollar-sign"></i>
+                                        سعر السيارة (د.ل)
+                                    </label>
+                                    <input type="number" id="carPriceAdd" class="form-control" placeholder="أدخل سعر السيارة" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-plus"></i>
+                                إضافة السيارة
+                            </button>
+                        </form>
+                        
+                        <div id="carsList" class="cars-list"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast hidden">
+        <div class="toast-content">
+            <span id="toastMessage"></span>
+            <button onclick="hideToast()"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

@@ -1,0 +1,7 @@
+{
+  "financialSettings": {
+    "ceiling": 120000,
+    "profitRate": 3,
+    "discountedRate": 2
+  }
+}
