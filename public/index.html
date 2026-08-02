@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>حاسبة تمويل السيارات الاحترافية</title>
+    <title>حاسبة الشهاب</title>
+    <link rel="icon" type="image/png" href="logo.png">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -12,7 +13,7 @@
     <!-- Loading Screen -->
     <div id="loading" class="loading-screen">
         <div class="loader">
-            <i class="fas fa-car"></i>
+            <img src="logo.png" alt="الشهاب" class="loader-logo">
             <p>جاري التحميل...</p>
         </div>
     </div>
@@ -22,8 +23,8 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo">
-                    <i class="fas fa-calculator"></i>
-                    <h1>حاسبة تمويل السيارات</h1>
+                    <img src="logo.png" alt="الشهاب لاستيراد السيارات" class="brand-logo">
+                    <h1>حاسبة الشهاب</h1>
                 </div>
                 <div class="header-controls">
                     <button class="btn btn-outline" onclick="toggleTheme()">
@@ -93,9 +94,97 @@
                                 <i class="fas fa-save"></i>
                                 حفظ الإعدادات
                             </button>
+                        </div>
+
+                        <hr class="settings-divider">
+
+                        <!-- إدارة السيارات -->
+                        <h4 class="settings-subtitle">
+                            <i class="fas fa-car"></i>
+                            إدارة السيارات
+                        </h4>
+
+                        <form id="carForm" class="car-form">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="carName">
+                                        <i class="fas fa-tag"></i>
+                                        اسم السيارة والموديل
+                                    </label>
+                                    <input type="text" id="carName" class="form-control" placeholder="مثال: تويوتا كامري 2024" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="carPriceAdd">
+                                        <i class="fas fa-dollar-sign"></i>
+                                        سعر الشراء (د.ل)
+                                    </label>
+                                    <input type="number" id="carPriceAdd" class="form-control" placeholder="أدخل سعر الشراء" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="carClosingMode">
+                                        <i class="fas fa-handshake"></i>
+                                        سعر الإغلاق
+                                    </label>
+                                    <select id="carClosingMode" class="form-control">
+                                        <option value="none">بدون</option>
+                                        <option value="fixed">قيمة ثابتة</option>
+                                        <option value="range">نطاق من – إلى</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="carClosingFixedGroup" style="display: none;">
+                                    <label for="carClosingPrice">القيمة (د.ل)</label>
+                                    <input type="number" id="carClosingPrice" class="form-control" placeholder="سعر الإغلاق">
+                                </div>
+                                <div class="form-group" id="carClosingRangeGroup" style="display: none;">
+                                    <label>النطاق (د.ل)</label>
+                                    <div class="range-inputs">
+                                        <input type="number" id="carClosingMin" class="form-control" placeholder="من">
+                                        <span class="range-sep">–</span>
+                                        <input type="number" id="carClosingMax" class="form-control" placeholder="إلى">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- صورة السيارة -->
+                            <div class="car-image-picker">
+                                <div class="car-image-actions">
+                                    <button type="button" class="btn btn-outline" onclick="searchCarImages()">
+                                        <i class="fas fa-magnifying-glass"></i>
+                                        ابحث عن صور السيارة
+                                    </button>
+                                    <label class="btn btn-outline upload-label">
+                                        <i class="fas fa-upload"></i>
+                                        رفع صورة
+                                        <input type="file" id="carImageUpload" accept="image/*" hidden>
+                                    </label>
+                                    <div id="carImageChosen" class="car-image-chosen hidden">
+                                        <img id="carImageChosenPreview" alt="">
+                                        <button type="button" class="btn btn-outline btn-sm" onclick="clearChosenImage()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="imageResults" class="image-results hidden"></div>
+                            </div>
+
+                            <div class="button-group">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-plus"></i>
+                                    <span id="carFormSubmitLabel">إضافة السيارة</span>
+                                </button>
+                                <button type="button" class="btn btn-outline hidden" id="carFormCancel" onclick="cancelCarEdit()">
+                                    <i class="fas fa-times"></i>
+                                    إلغاء التعديل
+                                </button>
+                            </div>
+                        </form>
+
+                        <div id="carsList" class="cars-list"></div>
+
+                        <div class="button-group" style="margin-top: 1.5rem;">
                             <button class="btn btn-danger" onclick="clearAllData()">
                                 <i class="fas fa-trash"></i>
-                                مسح جميع البيانات
+                                مسح جميع السيارات
                             </button>
                         </div>
                     </div>
@@ -145,19 +234,49 @@
                                         <option value="yes">نعم</option>
                                     </select>
                                 </div>
+                                <div class="form-group car-picker-group">
+                                    <label for="carSelect">
+                                        <i class="fas fa-car-side"></i>
+                                        السيارة
+                                    </label>
+                                    <select id="carSelect" class="form-control">
+                                        <option value="">إدخال يدوي</option>
+                                    </select>
+                                    <div id="carPreview" class="car-preview hidden">
+                                        <img id="carPreviewImage" alt="">
+                                        <div class="car-preview-info">
+                                            <strong id="carPreviewName"></strong>
+                                            <span id="carPreviewClosing"></span>
+                                        </div>
+                                        <button type="button" class="btn btn-outline btn-sm" onclick="clearCarSelection()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="form-group">
                                     <label for="carPrice">
-                                        <i class="fas fa-car"></i>
+                                        <i class="fas fa-tag"></i>
                                         سعر شراء السيارة (د.ل)
                                     </label>
                                     <input type="number" id="carPrice" class="form-control" placeholder="أدخل سعر السيارة" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="closingPrice">
+                                    <label for="closingMode">
                                         <i class="fas fa-handshake"></i>
-                                        سعر الإغلاق (د.ل) <span style="color: var(--text-secondary); font-size: 0.85rem;">(اختياري)</span>
+                                        سعر الإغلاق (د.ل) <span class="field-hint">(اختياري)</span>
                                     </label>
-                                    <input type="number" id="closingPrice" class="form-control" placeholder="أدخل سعر الإغلاق (اختياري)">
+                                    <select id="closingMode" class="form-control">
+                                        <option value="fixed">قيمة ثابتة</option>
+                                        <option value="range">نطاق من – إلى</option>
+                                    </select>
+                                    <div id="closingFixedWrap" style="margin-top: 0.6rem;">
+                                        <input type="number" id="closingPrice" class="form-control" placeholder="أدخل سعر الإغلاق">
+                                    </div>
+                                    <div id="closingRangeWrap" class="range-inputs hidden" style="margin-top: 0.6rem;">
+                                        <input type="number" id="closingMin" class="form-control" placeholder="من">
+                                        <span class="range-sep">–</span>
+                                        <input type="number" id="closingMax" class="form-control" placeholder="إلى">
+                                    </div>
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-primary btn-large">
@@ -177,40 +296,6 @@
                 </div>
             </section>
 
-            <!-- Cars Management Section -->
-            <section class="cars-section">
-                <div class="card">
-                    <div class="card-header">
-                        <h3><i class="fas fa-car"></i> إدارة السيارات</h3>
-                    </div>
-                    <div class="card-body">
-                        <form id="carForm" class="car-form">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label for="carName">
-                                        <i class="fas fa-tag"></i>
-                                        اسم السيارة
-                                    </label>
-                                    <input type="text" id="carName" class="form-control" placeholder="مثال: تويوتا كامري 2024" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="carPriceAdd">
-                                        <i class="fas fa-dollar-sign"></i>
-                                        سعر السيارة (د.ل)
-                                    </label>
-                                    <input type="number" id="carPriceAdd" class="form-control" placeholder="أدخل سعر السيارة" required>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-plus"></i>
-                                إضافة السيارة
-                            </button>
-                        </form>
-                        
-                        <div id="carsList" class="cars-list"></div>
-                    </div>
-                </div>
-            </section>
         </div>
     </main>
 
@@ -223,6 +308,7 @@
     </div>
 
     <script src="firebase-config.js"></script>
+    <script src="search-config.js"></script>
     <script type="module" src="firebase-store.js"></script>
     <script src="script.js"></script>
 </body>

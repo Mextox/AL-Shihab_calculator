@@ -208,6 +208,24 @@ function formatWhole(number) {
     }).format(number);
 }
 
+// أسماء السيارات تأتي من إدخال المستخدم وتُحقن في HTML، فتُهرَّب أولاً
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// يعرض قيمة واحدة إن تساوى الحدّان، ونطاقاً إن اختلفا
+function formatRange(low, high, unit) {
+    if (Math.abs(high - low) < 0.01) {
+        return `${formatNumber(low)} ${unit}`;
+    }
+    return `${formatNumber(low)} – ${formatNumber(high)} ${unit}`;
+}
+
 function validateForm(formData) {
     const required = ['salary', 'years', 'carPrice']; // حذف closingPrice من المطلوبة
     const missing = required.filter(field => !formData[field] || formData[field] <= 0);
@@ -629,13 +647,46 @@ function updateYearAvailability() {
     }
 }
 
+// ————— سعر الإغلاق: قيمة ثابتة أو نطاق —————
+// النطاق ينعكس على صافي العميل والخسارة فقط، أما القسط ودفعة المصرف
+// فلا يعتمدان على سعر الإغلاق إطلاقاً.
+function readClosingInput() {
+    const mode = document.getElementById('closingMode').value;
+
+    if (mode === 'range') {
+        const min = parseFloat(document.getElementById('closingMin').value) || 0;
+        const max = parseFloat(document.getElementById('closingMax').value) || 0;
+        if (min <= 0 && max <= 0) return { type: 'none' };
+        return { type: 'range', min: Math.min(min, max), max: Math.max(min, max) };
+    }
+
+    const value = parseFloat(document.getElementById('closingPrice').value) || 0;
+    return value > 0 ? { type: 'fixed', value } : { type: 'none' };
+}
+
+function closingBounds(closing) {
+    if (closing.type === 'fixed') return { low: closing.value, high: closing.value };
+    if (closing.type === 'range') return { low: closing.min, high: closing.max };
+    return { low: 0, high: 0 };
+}
+
+function describeClosing(closing) {
+    if (closing.type === 'fixed') return `${formatNumber(closing.value)} د.ل`;
+    if (closing.type === 'range') {
+        return `${formatNumber(closing.min)} – ${formatNumber(closing.max)} د.ل`;
+    }
+    return 'بدون سعر إغلاق';
+}
+
 // Calculator Functions
 function calculate() {
+    const closing = readClosingInput();
     const formData = {
         salary: parseFloat(document.getElementById('salary').value),
         years: parseInt(document.getElementById('years').value),
         carPrice: parseFloat(document.getElementById('carPrice').value),
-        closingPrice: parseFloat(document.getElementById('closingPrice').value) || 0, // اختياري
+        closing,
+        closingPrice: closingBounds(closing).low, // للتوافق مع عمليات التحقق
         hasDiscount: document.getElementById('hasDiscount').value === 'yes'
     };
     
@@ -671,20 +722,32 @@ function calculate() {
     
     const totalInstallments = monthlyInstallment * months;
     const bankPayment = finalCarPrice - totalInstallments;
-    const customerContribution = formData.closingPrice - bankPayment;
-    
+
+    // مع نطاق الإغلاق يصبح صافي العميل والخسارة نطاقين. لاحظ أن أعلى سعر
+    // إغلاق يعطي أعلى صافٍ وأقل خسارة، فالحدود تنعكس بين المقياسين.
+    const { low, high } = closingBounds(closing);
+    const contributionLow = low - bankPayment;
+    const contributionHigh = high - bankPayment;
+
     // خسارة العميل = الفرق بين السعر النهائي بعد الربح وسعر الإغلاق.
     // الصيغة السابقة (totalInstallments - customerContribution) تختصر جبرياً
     // إلى هذه المعادلة نفسها لأن حد الأقساط يُلغى، فكُتبت هنا صريحة.
-    const customerLoss = finalCarPrice - formData.closingPrice;
-    const lossPercentage = (customerLoss / formData.carPrice) * 100;
-    
+    const lossLow = finalCarPrice - high;
+    const lossHigh = finalCarPrice - low;
+    const lossPercentLow = (lossLow / formData.carPrice) * 100;
+    const lossPercentHigh = (lossHigh / formData.carPrice) * 100;
+
+    const hasClosing = closing.type !== 'none';
+    const isRange = closing.type === 'range';
+
     // Check feasibility
     let feasibilityNote = '';
-    if (formData.closingPrice === 0) {
+    if (!hasClosing) {
         feasibilityNote = 'تنبيه: لم يتم إدخال سعر الإغلاق - الحساب تم بدون سعر إغلاق';
-    } else if (customerContribution < 0) {
+    } else if (contributionHigh < 0) {
         feasibilityNote = 'تحذير: صافي العميل سالب - يحتاج العميل مبلغ إضافي';
+    } else if (contributionLow < 0) {
+        feasibilityNote = 'تنبيه: صافي العميل قد يكون سالباً في أدنى سعر إغلاق';
     } else {
         feasibilityNote = 'صافي العميل مناسب';
     }
@@ -708,9 +771,16 @@ function calculate() {
         finalCarPrice,
         totalInstallments,
         bankPayment,
-        customerContribution,
-        customerLoss,
-        lossPercentage,
+        // نطاقات (تتساوى حدودها عند القيمة الثابتة)
+        hasClosing,
+        isRange,
+        closingLabel: describeClosing(closing),
+        contributionLow,
+        contributionHigh,
+        lossLow,
+        lossHigh,
+        lossPercentLow,
+        lossPercentHigh,
         note,
         feasibilityNote,
         rate,
@@ -720,7 +790,6 @@ function calculate() {
         carPrice: formData.carPrice,
         profitAmount,
         years: formData.years,
-        closingPrice: formData.closingPrice,
         // Bank details
         requiredSystemEntry,
         remainingPaymentForProfit,
@@ -768,13 +837,13 @@ function displayResults(results) {
             <div class="value">${formatNumber(results.bankPayment)} د.ل</div>
         </div>
         
-        ${results.closingPrice > 0 ? `
+        ${results.hasClosing ? `
             <div class="result-item">
                 <div class="label">
                     <i class="fas fa-user"></i>
-                    صافي للعميل
+                    صافي للعميل${results.isRange ? ' <span class="range-badge">نطاق</span>' : ''}
                 </div>
-                <div class="value">${formatNumber(results.customerContribution)} د.ل</div>
+                <div class="value">${formatRange(results.contributionLow, results.contributionHigh, 'د.ل')}</div>
             </div>` : `
             <div class="result-item" style="border: 2px solid var(--warning-color); background: rgba(245, 158, 11, 0.05);">
                 <div class="label" style="color: var(--warning-color);">
@@ -785,21 +854,21 @@ function displayResults(results) {
             </div>`
         }
         
-        ${results.closingPrice > 0 ? `
+        ${results.hasClosing ? `
             <div class="result-item" style="border: 2px solid var(--danger-color); background: rgba(239, 68, 68, 0.05);">
                 <div class="label" style="color: var(--danger-color);">
                     <i class="fas fa-exclamation-triangle"></i>
-                    خسارة العميل
+                    خسارة العميل${results.isRange ? ' <span class="range-badge">نطاق</span>' : ''}
                 </div>
-                <div class="value" style="color: var(--danger-color);">${formatNumber(results.customerLoss)} د.ل</div>
+                <div class="value" style="color: var(--danger-color);">${formatRange(results.lossLow, results.lossHigh, 'د.ل')}</div>
             </div>
-            
+
             <div class="result-item" style="border: 2px solid var(--danger-color); background: rgba(239, 68, 68, 0.05);">
                 <div class="label" style="color: var(--danger-color);">
                     <i class="fas fa-chart-pie"></i>
-                    نسبة الخسارة
+                    نسبة الخسارة${results.isRange ? ' <span class="range-badge">نطاق</span>' : ''}
                 </div>
-                <div class="value" style="color: var(--danger-color);">${formatNumber(results.lossPercentage)}%</div>
+                <div class="value" style="color: var(--danger-color);">${formatRange(results.lossPercentLow, results.lossPercentHigh, '%')}</div>
             </div>` : ''
         }
         
@@ -918,8 +987,8 @@ function displayResults(results) {
         </div>
         
         ${results.feasibilityNote !== 'صافي العميل مناسب' ? 
-            `<div class="result-note" style="background: ${results.closingPrice === 0 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; border-color: ${results.closingPrice === 0 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${results.closingPrice === 0 ? 'var(--warning-color)' : 'var(--danger-color)'};">
-                <i class="fas ${results.closingPrice === 0 ? 'fa-info-circle' : 'fa-exclamation-triangle'}"></i>
+            `<div class="result-note" style="background: ${!results.hasClosing ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; border-color: ${!results.hasClosing ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${!results.hasClosing ? 'var(--warning-color)' : 'var(--danger-color)'};">
+                <i class="fas ${!results.hasClosing ? 'fa-info-circle' : 'fa-exclamation-triangle'}"></i>
                 ${results.feasibilityNote}
             </div>` : ''
         }
@@ -939,6 +1008,7 @@ async function loadCars() {
     const cars = await API.getCars();
     appState.cars = cars;
     renderCarsList();
+    refreshCarSelect();
 }
 
 function renderCarsList() {
@@ -956,14 +1026,21 @@ function renderCarsList() {
     
     carsList.innerHTML = appState.cars.map((car, index) => `
         <div class="car-item">
+            ${car.imageUrl
+                ? `<img class="car-thumb" src="${escapeAttr(car.imageUrl)}" alt="${escapeAttr(car.name)}" loading="lazy">`
+                : `<div class="car-thumb car-thumb-empty"><i class="fas fa-car"></i></div>`}
             <div class="car-info">
-                <div class="car-name">${car.name}</div>
+                <div class="car-name">${escapeHtml(car.name)}</div>
                 <div class="car-price">${formatNumber(car.price)} د.ل</div>
+                <div class="car-closing">${describeCarClosing(car)}</div>
             </div>
             <div class="car-actions">
                 <button class="btn btn-primary btn-small" onclick="useCar(${index})">
                     <i class="fas fa-calculator"></i>
                     استخدم
+                </button>
+                <button class="btn btn-outline btn-small" onclick="editCar(${index})">
+                    <i class="fas fa-pen"></i>
                 </button>
                 <button class="btn btn-danger btn-small" onclick="deleteCar(${index})">
                     <i class="fas fa-trash"></i>
@@ -973,70 +1050,412 @@ function renderCarsList() {
     `).join('');
 }
 
+// ملخّص مختصر داخل القائمة، فتُعرض الأسعار بأرقام صحيحة بلا كسور
+function describeCarClosing(car) {
+    if (car.closingType === 'fixed') {
+        return `إغلاق: ${formatWhole(car.closingPrice)} د.ل`;
+    }
+    if (car.closingType === 'range') {
+        return `إغلاق: ${formatWhole(car.closingMin)} – ${formatWhole(car.closingMax)} د.ل`;
+    }
+    return 'بدون سعر إغلاق';
+}
+
+// ————— اختيار السيارة داخل الحاسبة —————
+
+function refreshCarSelect() {
+    const select = document.getElementById('carSelect');
+    const previous = select.value;
+
+    select.innerHTML = '<option value="">إدخال يدوي</option>' +
+        appState.cars.map((car, i) =>
+            `<option value="${i}">${escapeHtml(car.name)} — ${formatNumber(car.price)} د.ل</option>`
+        ).join('');
+
+    // نحافظ على الاختيار السابق ما دام ما يزال موجوداً
+    if (previous && appState.cars[Number(previous)]) {
+        select.value = previous;
+    } else if (previous) {
+        clearCarSelection();
+    }
+}
+
+function applyCarSelection() {
+    const index = document.getElementById('carSelect').value;
+    const preview = document.getElementById('carPreview');
+
+    if (index === '') {
+        preview.classList.add('hidden');
+        updateYearAvailability();
+        return;
+    }
+
+    const car = appState.cars[Number(index)];
+    if (!car) return;
+
+    document.getElementById('carPrice').value = car.price;
+
+    // سعر الإغلاق يُملأ من بيانات السيارة
+    const modeSelect = document.getElementById('closingMode');
+    if (car.closingType === 'range') {
+        modeSelect.value = 'range';
+        document.getElementById('closingMin').value = car.closingMin;
+        document.getElementById('closingMax').value = car.closingMax;
+        document.getElementById('closingPrice').value = '';
+    } else if (car.closingType === 'fixed') {
+        modeSelect.value = 'fixed';
+        document.getElementById('closingPrice').value = car.closingPrice;
+        document.getElementById('closingMin').value = '';
+        document.getElementById('closingMax').value = '';
+    } else {
+        modeSelect.value = 'fixed';
+        ['closingPrice', 'closingMin', 'closingMax']
+            .forEach(id => { document.getElementById(id).value = ''; });
+    }
+    updateClosingMode();
+
+    const image = document.getElementById('carPreviewImage');
+    if (car.imageUrl) {
+        image.src = car.imageUrl;
+        image.classList.remove('hidden');
+    } else {
+        image.removeAttribute('src');
+        image.classList.add('hidden');
+    }
+    document.getElementById('carPreviewName').textContent = car.name;
+    document.getElementById('carPreviewClosing').textContent = describeCarClosing(car);
+    preview.classList.remove('hidden');
+
+    updateYearAvailability();
+}
+
+function clearCarSelection() {
+    document.getElementById('carSelect').value = '';
+    document.getElementById('carPreview').classList.add('hidden');
+    updateYearAvailability();
+}
+
+function updateClosingMode() {
+    const isRange = document.getElementById('closingMode').value === 'range';
+    document.getElementById('closingFixedWrap').classList.toggle('hidden', isRange);
+    document.getElementById('closingRangeWrap').classList.toggle('hidden', !isRange);
+}
+
+function readCarClosingInput() {
+    const mode = document.getElementById('carClosingMode').value;
+
+    if (mode === 'fixed') {
+        const value = parseFloat(document.getElementById('carClosingPrice').value);
+        if (isNaN(value) || value <= 0) return { error: 'أدخل سعر إغلاق صحيح' };
+        return { closingType: 'fixed', closingPrice: value };
+    }
+
+    if (mode === 'range') {
+        const min = parseFloat(document.getElementById('carClosingMin').value);
+        const max = parseFloat(document.getElementById('carClosingMax').value);
+        if (isNaN(min) || isNaN(max) || min <= 0 || max <= 0) {
+            return { error: 'أدخل حدّي النطاق' };
+        }
+        return { closingType: 'range', closingMin: Math.min(min, max), closingMax: Math.max(min, max) };
+    }
+
+    return { closingType: 'none' };
+}
+
 async function addCar() {
     const name = document.getElementById('carName').value.trim();
     const price = parseFloat(document.getElementById('carPriceAdd').value);
-    
+
     if (!name) {
         showToast('يرجى إدخال اسم السيارة', 'error');
         return;
     }
-    
+
     if (isNaN(price) || price <= 0) {
         showToast('يرجى إدخال سعر صحيح للسيارة', 'error');
         return;
     }
-    
-    const existingCar = appState.cars.find(car => 
-        car.name.toLowerCase() === name.toLowerCase()
+
+    const closing = readCarClosingInput();
+    if (closing.error) {
+        showToast(closing.error, 'error');
+        return;
+    }
+
+    // عند التعديل نستثني السيارة نفسها من فحص التكرار
+    const duplicate = appState.cars.find((car, i) =>
+        i !== carEditIndex && car.name.toLowerCase() === name.toLowerCase()
     );
-    
-    if (existingCar) {
+    if (duplicate) {
         showToast('السيارة موجودة مسبقاً', 'error');
         return;
     }
-    
-    appState.cars.push({ name, price });
-    
+
+    const car = { name, price, ...closing };
+    if (chosenImageUrl) car.imageUrl = chosenImageUrl;
+
+    const editing = carEditIndex >= 0;
+    if (editing) {
+        appState.cars[carEditIndex] = car;
+    } else {
+        appState.cars.push(car);
+    }
+
     const success = await API.saveCars(appState.cars);
     if (success) {
-        document.getElementById('carName').value = '';
-        document.getElementById('carPriceAdd').value = '';
+        resetCarForm();
         renderCarsList();
-        showToast('تم إضافة السيارة بنجاح', 'success');
+        refreshCarSelect();
+        showToast(editing ? 'تم تعديل السيارة بنجاح' : 'تم إضافة السيارة بنجاح', 'success');
+    } else if (editing) {
+        await loadCars(); // تراجع عن التعديل المحلي بعد فشل الحفظ
+    } else {
+        appState.cars.pop();
     }
 }
 
+// «استخدم» من قائمة الإعدادات: يختار السيارة في الحاسبة ويعود إليها
 function useCar(index) {
     const car = appState.cars[index];
-    document.getElementById('carPrice').value = car.price;
-    // Remove auto-fill for closing price as requested by user
-    updateYearAvailability();
+    if (!car) return;
+
+    document.getElementById('carSelect').value = String(index);
+    applyCarSelection();
+    closeSettingsPanel();
     showToast(`تم استخدام بيانات ${car.name}`, 'success');
-    
-    // Scroll to calculator
     document.querySelector('.calculator-section').scrollIntoView({ behavior: 'smooth' });
 }
 
+function editCar(index) {
+    const car = appState.cars[index];
+    carEditIndex = index;
+
+    document.getElementById('carName').value = car.name;
+    document.getElementById('carPriceAdd').value = car.price;
+    document.getElementById('carClosingMode').value = car.closingType || 'none';
+    document.getElementById('carClosingPrice').value = car.closingPrice || '';
+    document.getElementById('carClosingMin').value = car.closingMin || '';
+    document.getElementById('carClosingMax').value = car.closingMax || '';
+    updateCarClosingFields();
+
+    setChosenImage(car.imageUrl || '');
+    document.getElementById('carFormSubmitLabel').textContent = 'حفظ التعديل';
+    document.getElementById('carFormCancel').classList.remove('hidden');
+    document.getElementById('carName').focus();
+}
+
+function cancelCarEdit() {
+    resetCarForm();
+    showToast('أُلغي التعديل', 'success');
+}
+
+function resetCarForm() {
+    carEditIndex = -1;
+    ['carName', 'carPriceAdd', 'carClosingPrice', 'carClosingMin', 'carClosingMax']
+        .forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('carClosingMode').value = 'none';
+    updateCarClosingFields();
+    setChosenImage('');
+    document.getElementById('imageResults').classList.add('hidden');
+    document.getElementById('carFormSubmitLabel').textContent = 'إضافة السيارة';
+    document.getElementById('carFormCancel').classList.add('hidden');
+}
+
+function updateCarClosingFields() {
+    const mode = document.getElementById('carClosingMode').value;
+    document.getElementById('carClosingFixedGroup').style.display = mode === 'fixed' ? '' : 'none';
+    document.getElementById('carClosingRangeGroup').style.display = mode === 'range' ? '' : 'none';
+}
+
 async function deleteCar(index) {
-    if (confirm('هل أنت متأكد من حذف هذه السيارة؟')) {
-        appState.cars.splice(index, 1);
-        const success = await API.saveCars(appState.cars);
-        if (success) {
-            renderCarsList();
-            showToast('تم حذف السيارة بنجاح', 'success');
-        }
+    if (!confirm('هل أنت متأكد من حذف هذه السيارة؟')) return;
+
+    const removed = appState.cars.splice(index, 1);
+    const success = await API.saveCars(appState.cars);
+    if (success) {
+        if (carEditIndex === index) resetCarForm();
+        renderCarsList();
+        refreshCarSelect();
+        showToast('تم حذف السيارة بنجاح', 'success');
+    } else {
+        appState.cars.splice(index, 0, ...removed);
     }
 }
 
 async function clearAllData() {
-    if (confirm('هل أنت متأكد من مسح جميع البيانات؟ هذا الإجراء غير قابل للتراجع.')) {
-        appState.cars = [];
-        const success = await API.saveCars(appState.cars);
-        if (success) {
-            renderCarsList();
-            showToast('تم مسح جميع البيانات', 'success');
+    if (!confirm('هل أنت متأكد من مسح جميع السيارات؟ هذا الإجراء غير قابل للتراجع.')) return;
+
+    const backup = appState.cars;
+    appState.cars = [];
+    const success = await API.saveCars(appState.cars);
+    if (success) {
+        resetCarForm();
+        renderCarsList();
+        refreshCarSelect();
+        showToast('تم مسح جميع السيارات', 'success');
+    } else {
+        appState.cars = backup;
+    }
+}
+
+// ————— صور السيارات: بحث Google ثم حفظ في Firebase Storage —————
+
+let carEditIndex = -1;      // -1 يعني إضافة سيارة جديدة
+let chosenImageUrl = '';    // رابط الصورة المختارة بعد رفعها إلى Storage
+
+function searchConfigured() {
+    const c = window.SEARCH_CONFIG;
+    return !!(c && c.apiKey && c.searchEngineId);
+}
+
+function setChosenImage(url) {
+    chosenImageUrl = url || '';
+    const wrap = document.getElementById('carImageChosen');
+    const preview = document.getElementById('carImageChosenPreview');
+
+    if (chosenImageUrl) {
+        preview.src = chosenImageUrl;
+        wrap.classList.remove('hidden');
+    } else {
+        preview.removeAttribute('src');
+        wrap.classList.add('hidden');
+    }
+}
+
+function clearChosenImage() {
+    setChosenImage('');
+}
+
+async function searchCarImages() {
+    const query = document.getElementById('carName').value.trim();
+    const results = document.getElementById('imageResults');
+
+    if (!query) {
+        showToast('اكتب اسم السيارة والموديل أولاً', 'error');
+        document.getElementById('carName').focus();
+        return;
+    }
+
+    if (!searchConfigured()) {
+        showToast('البحث غير مضبوط — أضف مفاتيح Google في search-config.js، أو ارفع صورة من جهازك', 'error');
+        return;
+    }
+
+    results.classList.remove('hidden');
+    results.innerHTML = '<div class="image-results-status"><i class="fas fa-spinner fa-spin"></i> جارٍ البحث…</div>';
+
+    const { apiKey, searchEngineId } = window.SEARCH_CONFIG;
+    const url = 'https://www.googleapis.com/customsearch/v1'
+        + `?key=${encodeURIComponent(apiKey)}`
+        + `&cx=${encodeURIComponent(searchEngineId)}`
+        + `&q=${encodeURIComponent(query + ' سيارة')}`
+        + '&searchType=image&num=8&imgSize=large&safe=active';
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!response.ok) {
+            const reason = (data.error && data.error.message) || `HTTP ${response.status}`;
+            results.innerHTML = `<div class="image-results-status error">تعذّر البحث: ${escapeHtml(reason)}</div>`;
+            return;
         }
+
+        const items = data.items || [];
+        if (items.length === 0) {
+            results.innerHTML = '<div class="image-results-status">لا توجد نتائج — جرّب صياغة أخرى</div>';
+            return;
+        }
+
+        results.innerHTML = `
+            <div class="image-results-status">اختر صورة (${items.length} نتيجة)</div>
+            <div class="image-grid">
+                ${items.map((item, i) => `
+                    <button type="button" class="image-option" data-index="${i}" title="${escapeAttr(item.title || '')}">
+                        <img src="${escapeAttr(item.link)}" alt="" loading="lazy">
+                    </button>
+                `).join('')}
+            </div>
+        `;
+
+        results.querySelectorAll('.image-option').forEach(button => {
+            button.addEventListener('click', () => {
+                const item = items[Number(button.dataset.index)];
+                pickSearchResult(item.link, button);
+            });
+        });
+    } catch (error) {
+        console.error('فشل البحث عن الصور:', error);
+        results.innerHTML = '<div class="image-results-status error">تعذّر الاتصال بخدمة البحث</div>';
+    }
+}
+
+// الصورة المختارة تُنسخ إلى Firebase Storage حتى لا تعتمد على بقاء
+// الموقع المصدر ولا يمنعها حظر الوصل المباشر لاحقاً
+async function pickSearchResult(imageUrl, button) {
+    if (!cloudEnabled()) {
+        setChosenImage(imageUrl);
+        showToast('حُفظ رابط الصورة (Firebase غير مفعّل فلا يمكن نسخها)', 'success');
+        return;
+    }
+
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const blob = await response.blob();
+        const extension = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        const stored = await window.CloudStore.uploadImageBlob(blob, extension);
+
+        setChosenImage(stored);
+        document.getElementById('imageResults').classList.add('hidden');
+        showToast('تم اختيار الصورة وحفظها', 'success');
+    } catch (error) {
+        console.error('تعذّر نسخ الصورة:', error);
+        // بعض المواقع تمنع الجلب من المتصفح، فنستخدم الرابط مباشرة
+        setChosenImage(imageUrl);
+        document.getElementById('imageResults').classList.add('hidden');
+        showToast('تعذّر نسخ الصورة إلى التخزين — استُخدم الرابط المباشر', 'error');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = original;
+    }
+}
+
+async function handleImageUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        showToast('اختر ملف صورة', 'error');
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('حجم الصورة يتجاوز 5 ميجابايت', 'error');
+        return;
+    }
+
+    if (!cloudEnabled()) {
+        showToast('رفع الصور يتطلب تفعيل Firebase', 'error');
+        return;
+    }
+
+    showToast('جارٍ رفع الصورة…', 'success');
+    try {
+        const extension = (file.name.split('.').pop() || 'jpg').toLowerCase();
+        const url = await window.CloudStore.uploadImageBlob(file, extension);
+        setChosenImage(url);
+        showToast('تم رفع الصورة', 'success');
+    } catch (error) {
+        console.error('فشل رفع الصورة:', error);
+        showToast(`فشل الرفع — ${window.CloudStore.describeStoreError(error)}`, 'error');
+    } finally {
+        event.target.value = '';
     }
 }
 
@@ -1107,6 +1526,23 @@ function setupEventListeners() {
         document.getElementById(fieldId).addEventListener('input', updateYearAvailability);
     });
     document.getElementById('hasDiscount').addEventListener('change', updateYearAvailability);
+
+    // اختيار السيارة يملأ السعر وسعر الإغلاق ويعرض الصورة
+    document.getElementById('carSelect').addEventListener('change', applyCarSelection);
+    document.getElementById('closingMode').addEventListener('change', updateClosingMode);
+
+    // تعديل السعر يدوياً يعني خروجاً عن السيارة المختارة
+    document.getElementById('carPrice').addEventListener('input', () => {
+        const select = document.getElementById('carSelect');
+        const selected = appState.cars[Number(select.value)];
+        if (selected && parseFloat(document.getElementById('carPrice').value) !== selected.price) {
+            clearCarSelection();
+        }
+    });
+
+    // نموذج إضافة السيارة داخل الإعدادات
+    document.getElementById('carClosingMode').addEventListener('change', updateCarClosingFields);
+    document.getElementById('carImageUpload').addEventListener('change', handleImageUpload);
 }
 
 // Loading Management
@@ -1190,6 +1626,12 @@ window.clearAllData = clearAllData;
 window.hideToast = hideToast;
 window.submitLogin = submitLogin;
 window.adminSignOut = adminSignOut;
+window.closeSettings = closeSettings;
+window.editCar = editCar;
+window.cancelCarEdit = cancelCarEdit;
+window.clearCarSelection = clearCarSelection;
+window.searchCarImages = searchCarImages;
+window.clearChosenImage = clearChosenImage;
 
 // Start the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', initializeApp); 

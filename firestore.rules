@@ -35,7 +35,14 @@ service cloud.firestore {
 
     function isValidCar(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 120
-          && data.price is number && data.price > 0;
+          && data.price is number && data.price > 0
+          && data.closingType in ['none', 'fixed', 'range']
+          && (data.closingType != 'fixed'
+              || (data.closingPrice is number && data.closingPrice > 0))
+          && (data.closingType != 'range'
+              || (data.closingMin is number && data.closingMin > 0
+                  && data.closingMax is number && data.closingMax >= data.closingMin))
+          && (!('imageUrl' in data) || data.imageUrl is string);
     }
 
     // الإعدادات المالية: سقف المرابحة وهوامش الربح

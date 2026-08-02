@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// قواعد Firebase Storage لصور السيارات.
+//
+// القراءة متاحة للجميع حتى تظهر الصور في الحاسبة دون تسجيل دخول،
+// أما الرفع فمقصور على المسؤول الذي يحمل صلاحية admin.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    match /cars/{imageId} {
+      allow read: if true;
+      allow write: if isAdmin()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

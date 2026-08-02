@@ -15,6 +15,9 @@ import {
     getAuth, signInWithEmailAndPassword, signOut,
     onAuthStateChanged, setPersistence, browserLocalPersistence
 } from 'https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js';
+import {
+    getStorage, ref, uploadBytes, getDownloadURL
+} from 'https://www.gstatic.com/firebasejs/12.17.0/firebase-storage.js';
 
 const SETTINGS_DOC = ['config', 'financial'];
 const CARS_COLLECTION = 'cars';
@@ -44,6 +47,7 @@ async function init() {
         const app = initializeApp(config);
         store._db = getFirestore(app);
         store._auth = getAuth(app);
+        store._storage = getStorage(app);
 
         // إبقاء الجلسة بعد إغلاق المتصفح
         await setPersistence(store._auth, browserLocalPersistence);
@@ -100,6 +104,25 @@ store.getCars = async function () {
         .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
 };
 
+// الحقول المسموح حفظها — أي حقل آخر يرفضه firestore.rules
+function toCarDocument(car) {
+    const data = {
+        name: car.name,
+        price: car.price,
+        closingType: car.closingType || 'none'
+    };
+
+    if (data.closingType === 'fixed') {
+        data.closingPrice = car.closingPrice;
+    } else if (data.closingType === 'range') {
+        data.closingMin = car.closingMin;
+        data.closingMax = car.closingMax;
+    }
+
+    if (car.imageUrl) data.imageUrl = car.imageUrl;
+    return data;
+}
+
 // تُستبدل القائمة كاملة لتطابق واجهة saveCars الحالية في script.js
 store.saveCars = async function (cars) {
     if (!store.enabled) throw new Error('Firebase غير مفعّل');
@@ -109,11 +132,28 @@ store.saveCars = async function (cars) {
 
     existing.docs.forEach(d => batch.delete(d.ref));
     cars.forEach(car => {
-        const ref = doc(collection(store._db, CARS_COLLECTION));
-        batch.set(ref, { name: car.name, price: car.price });
+        const carRef = doc(collection(store._db, CARS_COLLECTION));
+        batch.set(carRef, toCarDocument(car));
     });
 
     await batch.commit();
+};
+
+// ————— صور السيارات في Firebase Storage —————
+
+// اسم ملف آمن ومميّز دون الاعتماد على أسماء عربية أو محارف خاصة
+function imagePath(seed) {
+    const stamp = new Date().toISOString().replace(/[^0-9]/g, '');
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `cars/${stamp}-${rand}-${seed}`;
+}
+
+store.uploadImageBlob = async function (blob, extension) {
+    if (!store.enabled) throw new Error('Firebase غير مفعّل');
+
+    const fileRef = ref(store._storage, imagePath(`image.${extension || 'jpg'}`));
+    await uploadBytes(fileRef, blob, { contentType: blob.type || 'image/jpeg' });
+    return await getDownloadURL(fileRef);
 };
 
 // ————— المصادقة —————
