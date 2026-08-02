@@ -5,6 +5,13 @@ rules_version = '2';
 // القراءة متاحة للجميع حتى تعمل الحاسبة دون تسجيل دخول، أما الكتابة
 // فمقصورة على المستخدمين المسجّلين في Firebase Authentication.
 //
+// مهم: الكتابة تشترط صلاحية admin وليس مجرد تسجيل الدخول. تسجيل الحسابات
+// في Firebase مفتوح للعموم افتراضياً، فشرط request.auth != null وحده يسمح
+// لأي غريب بإنشاء حساب ثم تعديل السقف ونسب الربح.
+//
+// تُمنح الصلاحية عبر custom claim من حساب خدمة:
+//   accounts:update  →  customAttributes: {"admin": true}
+//
 // ملاحظة: دوال التحقق يجب أن تُعرَّف داخل كتلة match، فتعريفها خارج
 // كتلة service خطأ صياغة يرفضه Firebase عند النشر.
 //
@@ -12,6 +19,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
 
     // التحقق من الإعدادات حتى لا تُكتب قيم تُفسد الحسابات
     function isValidSettings(data) {
@@ -30,16 +41,14 @@ service cloud.firestore {
     // الإعدادات المالية: سقف المرابحة وهوامش الربح
     match /config/{document} {
       allow read: if true;
-      allow create, update: if request.auth != null
-                            && isValidSettings(request.resource.data);
+      allow create, update: if isAdmin() && isValidSettings(request.resource.data);
     }
 
     // قائمة السيارات المحفوظة
     match /cars/{carId} {
       allow read: if true;
-      allow create, update: if request.auth != null
-                            && isValidCar(request.resource.data);
-      allow delete: if request.auth != null;
+      allow create, update: if isAdmin() && isValidCar(request.resource.data);
+      allow delete: if isAdmin();
     }
   }
 }

@@ -209,6 +209,33 @@ Firebase هو **مصدر البيانات الوحيد** عند ضبطه: الإ
 5. **⚙ Project settings → Your apps → Web `</>`** وانسخ `firebaseConfig`
    إلى `public/firebase-config.js`
 6. **Firestore Database → Rules** والصق محتوى `firestore.rules` ثم **Publish**
+7. امنح المسؤول صلاحية `admin` (خطوة إلزامية — انظر أدناه)
+
+### ⚠ صلاحية admin إلزامية
+
+تسجيل الحسابات في Firebase **مفتوح للعموم افتراضياً**، فأي غريب يستطيع
+إنشاء حساب على مشروعك. لذلك تشترط القواعد صلاحية `admin` لا مجرد تسجيل
+الدخول. تُمنح هذه الصلاحية عبر custom claim من حساب خدمة:
+
+```js
+// accounts:update على Identity Toolkit بحساب خدمة
+{ localId: '<uid>', customAttributes: '{"admin": true}' }
+```
+
+بدونها لن يستطيع أحد الكتابة — ولا حتى أنت. وبعد منحها يجب **تسجيل الخروج
+والدخول من جديد** ليحمل الرمز الصلاحية الجديدة.
+
+**يُنصح إضافياً** بإغلاق التسجيل العام: **Authentication → Settings →
+User actions** وأزل تحديد **Enable create (sign-up)**. القواعد تحمي البيانات
+بدونه، لكن هذا يمنع تراكم حسابات غريبة على مشروعك.
+
+### نشر القواعد من الطرفية
+
+```bash
+npx --yes firebase-tools login
+npx --yes firebase-tools deploy --only firestore:rules
+```
+هذا المسار يُجمّع القواعد محلياً ويطبع رقم السطر لأي خطأ صياغة.
 
 ### بنية البيانات
 

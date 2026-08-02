@@ -163,7 +163,10 @@ store.describeStoreError = function (error) {
     const code = error && error.code;
 
     if (code === 'permission-denied') {
-        return 'قواعد أمان Firestore تمنع الوصول — انشر محتوى firestore.rules من لوحة Firebase';
+        // بعد نشر القواعد يعني هذا غالباً أن الحساب بلا صلاحية admin
+        return store.isSignedIn()
+            ? 'حسابك لا يملك صلاحية التعديل — يلزم منحه صلاحية admin ثم إعادة تسجيل الدخول'
+            : 'ليس لديك صلاحية الكتابة — سجّل الدخول بحساب مسؤول';
     }
     if (code === 'unavailable' || code === 'failed-precondition') {
         return 'تعذّر الوصول إلى Firestore — تحقّق من الاتصال ومن إنشاء قاعدة البيانات';

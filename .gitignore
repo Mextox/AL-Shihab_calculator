@@ -88,3 +88,7 @@ build/Release
 # Dependency directory
 # Commenting this out since it may be useful to commit the lock file
 # node_modules 
+# مفاتيح حسابات الخدمة — يجب ألا تُرفع أبداً
+mcp-key.json
+*-key.json
+serviceAccount*.json
