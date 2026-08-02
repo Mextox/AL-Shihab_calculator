@@ -55,6 +55,16 @@
                             <i class="fas fa-hdd"></i>
                             <span>هذه الإعدادات محفوظة في <strong>هذا المتصفح فقط</strong> ولن تظهر على الأجهزة الأخرى.</span>
                         </div>
+                        <div class="cloud-account-bar hidden">
+                            <span>
+                                <i class="fas fa-cloud"></i>
+                                مسجّل الدخول باسم <strong id="cloudUserEmail"></strong> — التعديلات تُطبَّق على كل الأجهزة
+                            </span>
+                            <button class="btn btn-outline btn-sm" onclick="adminSignOut()">
+                                <i class="fas fa-sign-out-alt"></i>
+                                خروج
+                            </button>
+                        </div>
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="ceiling">
@@ -212,6 +222,8 @@
         </div>
     </div>
 
+    <script src="firebase-config.js"></script>
+    <script type="module" src="firebase-store.js"></script>
     <script src="script.js"></script>
 </body>
 </html> 

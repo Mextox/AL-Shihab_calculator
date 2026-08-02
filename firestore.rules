@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// قواعد أمان Firestore لحاسبة تمويل السيارات.
+//
+// القراءة متاحة للجميع حتى تعمل الحاسبة دون تسجيل دخول، أما الكتابة
+// فمقصورة على المستخدمين المسجّلين في Firebase Authentication.
+//
+// للنشر: لوحة Firebase ← Firestore Database ← Rules ← الصق هذا الملف ← Publish
+// أو عبر الطرفية: firebase deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // الإعدادات المالية: سقف المرابحة وهوامش الربح
+    match /config/{document} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && isValidSettings(request.resource.data);
+    }
+
+    // قائمة السيارات المحفوظة
+    match /cars/{carId} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && isValidCar(request.resource.data);
+      allow delete: if request.auth != null;
+    }
+
+    // كل ما عدا ذلك مرفوض
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// التحقق من الإعدادات حتى لا تُكتب قيم تُفسد الحسابات
+function isValidSettings(data) {
+  return data.ceiling is number && data.ceiling > 0
+      && data.profitRate is number
+      && data.profitRate >= 0 && data.profitRate <= 100
+      && data.discountedRate is number
+      && data.discountedRate >= 0 && data.discountedRate <= 100;
+}
+
+function isValidCar(data) {
+  return data.name is string && data.name.size() > 0 && data.name.size() <= 120
+      && data.price is number && data.price > 0;
+}

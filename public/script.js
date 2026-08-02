@@ -29,9 +29,14 @@ const STORAGE_KEYS = {
 
 let staticMode = false; // يصبح true عند غياب خادم الـAPI
 
+function cloudEnabled() {
+    return !!(window.CloudStore && window.CloudStore.enabled);
+}
+
 function enterStaticMode() {
     if (staticMode) return;
     staticMode = true;
+    if (cloudEnabled()) return; // Firebase يتولى التخزين، فلا تنبيه محلي
     showToast('💾 لا يوجد خادم — يتم حفظ الإعدادات والسيارات في هذا المتصفح فقط', 'success');
     document.querySelectorAll('.local-storage-note').forEach(el => el.classList.remove('hidden'));
 }
@@ -59,6 +64,16 @@ function writeLocal(key, value) {
 
 const API = {
     async getSettings() {
+        if (cloudEnabled()) {
+            try {
+                return await window.CloudStore.getSettings();
+            } catch (error) {
+                console.error('تعذّرت قراءة الإعدادات من Firebase:', error);
+                showToast('تعذّر تحميل الإعدادات من Firebase — يتم استخدام القيم الافتراضية', 'error');
+                return null;
+            }
+        }
+
         if (!staticMode) {
             try {
                 const response = await fetch('/api/settings');
@@ -75,6 +90,18 @@ const API = {
     },
 
     async saveSettings(settings) {
+        if (cloudEnabled()) {
+            try {
+                await window.CloudStore.saveSettings(settings);
+                showToast('تم حفظ الإعدادات لجميع الأجهزة', 'success');
+                return true;
+            } catch (error) {
+                console.error('تعذّر حفظ الإعدادات في Firebase:', error);
+                showToast('فشل الحفظ — تأكد من تسجيل دخولك كمسؤول', 'error');
+                return false;
+            }
+        }
+
         if (!staticMode) {
             try {
                 const response = await fetch('/api/settings', {
@@ -106,6 +133,15 @@ const API = {
     },
 
     async getCars() {
+        if (cloudEnabled()) {
+            try {
+                return await window.CloudStore.getCars() || [];
+            } catch (error) {
+                console.error('تعذّرت قراءة السيارات من Firebase:', error);
+                return [];
+            }
+        }
+
         if (!staticMode) {
             try {
                 const response = await fetch('/api/cars');
@@ -122,6 +158,17 @@ const API = {
     },
 
     async saveCars(cars) {
+        if (cloudEnabled()) {
+            try {
+                await window.CloudStore.saveCars(cars);
+                return true;
+            } catch (error) {
+                console.error('تعذّر حفظ السيارات في Firebase:', error);
+                showToast('فشل الحفظ — تأكد من تسجيل دخولك كمسؤول', 'error');
+                return false;
+            }
+        }
+
         if (!staticMode) {
             try {
                 const response = await fetch('/api/cars', {
@@ -228,9 +275,101 @@ function toggleSettings() {
         showToast('🔒 تم إغلاق الإعدادات', 'success');
         return;
     }
-    
+
+    // مع Firebase تكفي الجلسة القائمة دون إعادة تسجيل الدخول
+    if (cloudEnabled() && window.CloudStore.isSignedIn()) {
+        openSettingsPanel();
+        return;
+    }
+
+    if (cloudEnabled()) {
+        showLoginModal();
+        return;
+    }
+
     // إظهار نافذة كلمة المرور
     showPasswordModal();
+}
+
+// ————— تسجيل دخول المسؤول عبر Firebase Authentication —————
+
+function showLoginModal() {
+    const modal = document.createElement('div');
+    modal.className = 'password-modal';
+    modal.innerHTML = `
+        <div class="password-modal-content">
+            <div class="password-modal-header">
+                <h3>
+                    <i class="fas fa-user-shield"></i>
+                    دخول المسؤول
+                </h3>
+                <button class="close-btn" onclick="closePasswordModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="password-modal-body">
+                <p>سجّل الدخول لتعديل الإعدادات وقائمة السيارات:</p>
+                <input type="email" id="loginEmail" class="form-control" placeholder="البريد الإلكتروني" autocomplete="username">
+                <input type="password" id="loginPassword" class="form-control" placeholder="كلمة المرور" autocomplete="current-password" style="margin-top: 0.75rem;">
+                <div class="password-modal-buttons">
+                    <button class="btn btn-primary" id="loginSubmit" onclick="submitLogin()">
+                        <i class="fas fa-sign-in-alt"></i>
+                        دخول
+                    </button>
+                    <button class="btn btn-outline" onclick="closePasswordModal()">
+                        <i class="fas fa-times"></i>
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    // قد يُغلق المستخدم النافذة قبل انتهاء المؤقّت، فنتحقق من بقاء الحقل
+    setTimeout(() => {
+        const field = document.getElementById('loginEmail');
+        if (field) field.focus();
+    }, 100);
+
+    ['loginEmail', 'loginPassword'].forEach(id => {
+        document.getElementById(id).addEventListener('keypress', e => {
+            if (e.key === 'Enter') submitLogin();
+        });
+    });
+}
+
+async function submitLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const button = document.getElementById('loginSubmit');
+
+    if (!email || !password) {
+        showToast('أدخل البريد الإلكتروني وكلمة المرور', 'error');
+        return;
+    }
+
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جارٍ الدخول...';
+
+    try {
+        await window.CloudStore.signIn(email, password);
+        closePasswordModal();
+        openSettingsPanel();
+        showToast(`🔓 مرحباً ${email}`, 'success');
+    } catch (error) {
+        showToast(`🚫 ${window.CloudStore.describeAuthError(error)}`, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-sign-in-alt"></i> دخول';
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginPassword').focus();
+    }
+}
+
+async function adminSignOut() {
+    await window.CloudStore.signOut();
+    closeSettings();
+    showToast('تم تسجيل الخروج', 'success');
 }
 
 function showPasswordModal() {
@@ -271,9 +410,10 @@ function showPasswordModal() {
     
     document.body.appendChild(modal);
     
-    // التركيز على حقل كلمة المرور
+    // التركيز على حقل كلمة المرور، مع التحقق من بقائه إن أُغلقت النافذة سريعاً
     setTimeout(() => {
-        document.getElementById('passwordInput').focus();
+        const field = document.getElementById('passwordInput');
+        if (field) field.focus();
     }, 100);
     
     // دعم مفتاح Enter
@@ -340,14 +480,19 @@ function closePasswordModal() {
     }
 }
 
-function closeSettings() {
+// إغلاق صامت — يُستخدم عندما تكون هناك رسالة أهم تُعرض للمستخدم
+function closeSettingsPanel() {
     const settingsPanel = document.getElementById('settingsPanel');
     const settingsButton = document.querySelector('button[onclick="toggleSettings()"]');
     const settingsIcon = settingsButton.querySelector('i');
-    
+
     settingsPanel.classList.add('hidden');
     settingsIcon.className = 'fas fa-lock';
     settingsButton.style.backgroundColor = '';
+}
+
+function closeSettings() {
+    closeSettingsPanel();
     showToast('🔒 تم إغلاق الإعدادات', 'success');
 }
 
@@ -412,7 +557,7 @@ async function saveSettings() {
     const success = await API.saveSettings(appState.settings);
     if (success) {
         updateYearAvailability(); // السقف والنسب تغيّرا فتتغير المدد المتاحة
-        toggleSettings();
+        closeSettingsPanel(); // صامت حتى تبقى رسالة نجاح الحفظ ظاهرة
     }
 }
 
@@ -970,11 +1115,46 @@ function hideLoadingScreen() {
 }
 
 // Application Initialization
+// وحدة Firebase تُحمَّل كـmodule فتنتهي تهيئتها بعد DOMContentLoaded،
+// لذا ننتظر إشارتها قبل قراءة أي بيانات. المهلة تمنع التعليق إن تعذّر
+// تحميل الوحدة، فيرجع التطبيق للتخزين المحلي.
+function waitForCloudStore(timeoutMs = 6000) {
+    if (window.__cloudStoreReady) return Promise.resolve();
+
+    return new Promise(resolve => {
+        const finish = () => {
+            clearTimeout(timer);
+            resolve();
+        };
+        const timer = setTimeout(finish, timeoutMs);
+        window.addEventListener('cloud-store-ready', finish, { once: true });
+    });
+}
+
+function setupCloudAccountBar() {
+    if (!cloudEnabled()) return;
+
+    window.CloudStore.onAuthChange(user => {
+        const bar = document.querySelector('.cloud-account-bar');
+        if (!bar) return;
+
+        bar.classList.toggle('hidden', !user);
+        if (user) {
+            document.getElementById('cloudUserEmail').textContent = user.email;
+        } else {
+            closeSettingsPanel(); // رسالة تسجيل الخروج تكفي
+        }
+    });
+}
+
 async function initializeApp() {
     try {
         // Initialize theme
         initializeTheme();
-        
+
+        await waitForCloudStore();
+        setupCloudAccountBar();
+
         // Load data
         await Promise.all([
             loadSettings(),
@@ -1005,6 +1185,8 @@ window.useCar = useCar;
 window.deleteCar = deleteCar;
 window.clearAllData = clearAllData;
 window.hideToast = hideToast;
+window.submitLogin = submitLogin;
+window.adminSignOut = adminSignOut;
 
 // Start the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', initializeApp); 
