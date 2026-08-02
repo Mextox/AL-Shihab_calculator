@@ -443,23 +443,71 @@ body {
 }
 
 /* ————— هوية الشهاب ————— */
+
+/* الترويسة تدرّج أزرق في الوضعين، واللوغو رسم أسود،
+   فيُقلب دائماً ليظهر أبيض ناصعاً فوقها */
 .brand-logo {
-    height: 46px;
+    height: 68px;
     width: auto;
     object-fit: contain;
+    filter: invert(1);
 }
 
+/* شاشة التحميل خلفيتها فاتحة، فيبقى الرسم أسود ويُقلب ليلاً فقط */
 .loader-logo {
-    height: 90px;
+    height: 120px;
     width: auto;
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
     object-fit: contain;
 }
 
-/* اللوغو رسم أسود بخلفية شفافة، فيُقلب في الوضع الليلي ليظهر أبيض */
-[data-theme="dark"] .brand-logo,
 [data-theme="dark"] .loader-logo {
     filter: invert(1);
+}
+
+/* الترويسة: العلامة في الوسط تماماً وأدوات التحكم على الجانب */
+.header-content {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logo {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.logo h1 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.header-controls {
+    grid-column: 3;
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.6rem;
+}
+
+@media (max-width: 720px) {
+    .header-content {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+
+    .logo,
+    .header-controls {
+        grid-column: 1;
+    }
+
+    .brand-logo { height: 54px; }
+    .logo h1 { font-size: 1.15rem; }
 }
 
 /* ————— نطاق سعر الإغلاق ————— */
@@ -674,7 +722,6 @@ body {
 }
 
 @media (max-width: 600px) {
-    .brand-logo { height: 36px; }
     .image-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 }
 

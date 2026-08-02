@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js';
 import {
     getAuth, signInWithEmailAndPassword, signOut,
-    onAuthStateChanged, setPersistence, browserLocalPersistence
+    onAuthStateChanged, setPersistence, browserLocalPersistence, getIdTokenResult
 } from 'https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js';
 import {
     getStorage, ref, uploadBytes, getDownloadURL
@@ -26,10 +26,43 @@ const store = {
     enabled: false,
     reason: '',
     user: null,
+    isAdmin: false,
     _db: null,
     _auth: null,
     _authWatchers: []
 };
+
+// صلاحية admin تُحمل داخل رمز الجلسة، فرمزٌ صدر قبل منحها لا يحويها
+// ويظل يُرفض حتى ينتهي (نحو ساعة). التحديث القسري يجلبها فوراً.
+async function refreshAdminClaim(force) {
+    if (!store.user) {
+        store.isAdmin = false;
+        return false;
+    }
+
+    try {
+        const result = await getIdTokenResult(store.user, force === true);
+        store.isAdmin = result.claims.admin === true;
+    } catch (error) {
+        console.error('تعذّر تحديث الصلاحيات:', error);
+    }
+    return store.isAdmin;
+}
+
+// أي رفض صلاحيات قد يكون رمزاً قديماً، فنجدّده ونعيد المحاولة مرة واحدة
+async function withClaimRetry(operation) {
+    try {
+        return await operation();
+    } catch (error) {
+        const denied = error && (error.code === 'permission-denied'
+            || error.code === 'storage/unauthorized');
+        if (!denied || !store.user) throw error;
+
+        const becameAdmin = await refreshAdminClaim(true);
+        if (!becameAdmin) throw error;
+        return await operation();
+    }
+}
 
 function isConfigured(config) {
     return !!(config && config.apiKey && config.projectId && config.appId);
@@ -52,9 +85,11 @@ async function init() {
         // إبقاء الجلسة بعد إغلاق المتصفح
         await setPersistence(store._auth, browserLocalPersistence);
 
-        onAuthStateChanged(store._auth, user => {
+        onAuthStateChanged(store._auth, async user => {
             store.user = user;
-            store._authWatchers.forEach(fn => fn(user));
+            // تحديث قسري عند كل دخول ليلتقط أي صلاحية مُنحت بعد آخر جلسة
+            await refreshAdminClaim(true);
+            store._authWatchers.forEach(fn => fn(user, store.isAdmin));
         });
 
         store.enabled = true;
@@ -86,11 +121,11 @@ store.saveSettings = async function (settings) {
     if (!store.enabled) throw new Error('Firebase غير مفعّل');
 
     const { ceiling, profitRate, discountedRate } = settings.financialSettings;
-    await setDoc(doc(store._db, ...SETTINGS_DOC), {
+    await withClaimRetry(() => setDoc(doc(store._db, ...SETTINGS_DOC), {
         ceiling, profitRate, discountedRate,
         updatedAt: new Date().toISOString(),
         updatedBy: store.user ? store.user.email : 'غير معروف'
-    });
+    }));
 };
 
 // ————— السيارات —————
@@ -127,16 +162,18 @@ function toCarDocument(car) {
 store.saveCars = async function (cars) {
     if (!store.enabled) throw new Error('Firebase غير مفعّل');
 
-    const existing = await getDocs(collection(store._db, CARS_COLLECTION));
-    const batch = writeBatch(store._db);
+    await withClaimRetry(async () => {
+        const existing = await getDocs(collection(store._db, CARS_COLLECTION));
+        const batch = writeBatch(store._db);
 
-    existing.docs.forEach(d => batch.delete(d.ref));
-    cars.forEach(car => {
-        const carRef = doc(collection(store._db, CARS_COLLECTION));
-        batch.set(carRef, toCarDocument(car));
+        existing.docs.forEach(d => batch.delete(d.ref));
+        cars.forEach(car => {
+            const carRef = doc(collection(store._db, CARS_COLLECTION));
+            batch.set(carRef, toCarDocument(car));
+        });
+
+        await batch.commit();
     });
-
-    await batch.commit();
 };
 
 // ————— صور السيارات في Firebase Storage —————
@@ -152,7 +189,7 @@ store.uploadImageBlob = async function (blob, extension) {
     if (!store.enabled) throw new Error('Firebase غير مفعّل');
 
     const fileRef = ref(store._storage, imagePath(`image.${extension || 'jpg'}`));
-    await uploadBytes(fileRef, blob, { contentType: blob.type || 'image/jpeg' });
+    await withClaimRetry(() => uploadBytes(fileRef, blob, { contentType: blob.type || 'image/jpeg' }));
     return await getDownloadURL(fileRef);
 };
 
@@ -170,7 +207,7 @@ store.signOut = async function () {
 
 store.onAuthChange = function (callback) {
     store._authWatchers.push(callback);
-    callback(store.user);
+    callback(store.user, store.isAdmin);
 };
 
 store.isSignedIn = function () {

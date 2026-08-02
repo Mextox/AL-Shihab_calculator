@@ -1326,6 +1326,21 @@ function clearChosenImage() {
     setChosenImage('');
 }
 
+// مسار لا يحتاج Storage ولا مفاتيح بحث — يعمل فوراً
+function promptImageUrl() {
+    const current = chosenImageUrl || '';
+    const url = (prompt('الصق رابط صورة السيارة:', current) || '').trim();
+    if (!url) return;
+
+    if (!/^https?:\/\//i.test(url)) {
+        showToast('الرابط يجب أن يبدأ بـ http أو https', 'error');
+        return;
+    }
+
+    setChosenImage(url);
+    showToast('تم اعتماد رابط الصورة', 'success');
+}
+
 async function searchCarImages() {
     const query = document.getElementById('carName').value.trim();
     const results = document.getElementById('imageResults');
@@ -1632,6 +1647,7 @@ window.cancelCarEdit = cancelCarEdit;
 window.clearCarSelection = clearCarSelection;
 window.searchCarImages = searchCarImages;
 window.clearChosenImage = clearChosenImage;
+window.promptImageUrl = promptImageUrl;
 
 // Start the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', initializeApp); 
